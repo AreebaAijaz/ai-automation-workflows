@@ -31,7 +31,7 @@ Schedule Trigger
 
 - **n8n** (cloud or self-hosted)
 - **Tavily API** for web search functionality
-- **Gemini API** (or alternative LLM provider)
+- **OpenAI API** (or alternative LLM provider)
 - **Gmail OAuth** for draft creation
 - Community Nodes enabled in n8n settings
 
