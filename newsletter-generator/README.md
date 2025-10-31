@@ -13,6 +13,9 @@ This workflow automates the entire newsletter creation process through a multi-a
 5. **Editorial** → AI agent compiles, formats, and styles into responsive HTML
 6. **Draft Generation** → Creates a Gmail draft ready for review
 
+![Workflow](workflow.jpg)
+
+
 ## Architecture
 
 ```
