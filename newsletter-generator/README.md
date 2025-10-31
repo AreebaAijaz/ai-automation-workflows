@@ -55,44 +55,20 @@ The workflow produces a complete newsletter draft including:
 ---
 
 
-# Getting Started
-## 1. Clone the Repository
-git clone https://github.com/AreebaAijaz/ai-automation-workflows.git
-cd newsletter-generator
+## 🚀 Getting Started
 
-## 2. Set Up n8n
-### Option A: n8n Cloud
+1. **Download** the `Newsletter.json` file from this repository
+2. Open your **n8n instance** (cloud or self-hosted at http://localhost:5678)
+3. Click **"Workflows"** → **"Import from File"**
+4. Select the downloaded JSON file and click **"Import"**
+5. The workflow will open with nodes that may show warning icons
+6. Configure the required credentials (see below)
+7. Click **"Execute Workflow"** to test
 
-Sign up at n8n.cloud
-Enable Community Nodes in Settings
+### 🔑 Required Credentials
 
-### Option B: Self-Host with Docker
-bashdocker run -it --rm \
-  -p 5678:5678 \
-  -e N8N_ENCRYPTION_KEY="your_secure_key" \
-  -v ~/.n8n:/home/node/.n8n \
-  n8nio/n8n:latest
-  
-## 3. Import the Workflow
+Before testing, you'll need to set up:
+- **OpenAI API Key**
+- **Tavily API Key**
+- **Gmail Account** 
 
-Open n8n (accessible at http://localhost:5678)
-Click "Add Workflow" → "Import from File"
-Select newsletter-workflow.json from this repository
-The workflow will load with all nodes configured
-
-## 4. Configure Credentials
-Set up the following in n8n's Credentials section:
-
-Tavily API – Get free key at tavily.com
-Gemini API – Get key from Google AI Studio
-Gmail OAuth – Follow n8n's OAuth setup wizard
-
-## 5. Customize & Test
-
-Update the niche/topic in the Initial Research node
-Keep the Schedule Trigger disabled while testing
-Click "Execute Workflow" to test manually
-Review the Gmail draft output
-
-## 6. Activate
-Once satisfied with the output, enable the Schedule Trigger to run automatically weekly.
