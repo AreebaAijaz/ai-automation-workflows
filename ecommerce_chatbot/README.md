@@ -4,7 +4,7 @@ This project is a modern e-commerce website built with Next.js and Tailwind CSS.
 It showcases a clean and responsive online shopping interface where users can explore various categories and products.
 
 Recently, I enhanced this project by integrating an AI Chatbot that assists visitors directly on the website — making the shopping experience more interactive and helpful.
-# 🔗 You can check this live at:
+🔗 You can check this live at:
 Website: https://hackathon-2-areebaaijaz.vercel.app/
 
 
@@ -44,3 +44,7 @@ Vercel for website hosting
 ✅ Real-time AI responses using n8n workflow
 ✅ Easy configuration via .env.local
 ✅ Fast and secure hosting through Vercel
+
+## 📝 Note
+
+This project may take a few seconds to respond the first time after inactivity, as the server goes into sleep mode when idle. Once awake, responses will be faster.
