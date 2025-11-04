@@ -31,7 +31,7 @@ Schedule Trigger
 
 - **n8n** (cloud or self-hosted)
 - **Tavily API** for web search functionality
-- **Gemini API** (or alternative LLM provider)
+- **OpenAI API** (or alternative LLM provider)
 - **Gmail OAuth** for draft creation
 - Community Nodes enabled in n8n settings
 
@@ -84,7 +84,7 @@ The workflow will load with all nodes configured
 Set up the following in n8n's Credentials section:
 
 Tavily API – Get free key at tavily.com
-Gemini API – Get key from Google AI Studio
+OpenAI API – Buy from OpenAi Platform
 Gmail OAuth – Follow n8n's OAuth setup wizard
 
 ## 5. Customize & Test
