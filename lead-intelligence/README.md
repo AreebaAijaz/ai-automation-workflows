@@ -154,6 +154,7 @@ User changes status → POST to n8n → Updates Google Sheets
 ## 📊 Live Demo
 
 **Dashboard:** https://leadintelligencedashboard.vercel.app/
+
 **Test Form:** https://forms.gle/oajx3cHpXbNdp4Da9
 
 Fill out the form and watch your submission appear on the dashboard with AI analysis in real-time!
@@ -163,13 +164,13 @@ Fill out the form and watch your submission appear on the dashboard with AI anal
 ## 🎨 Screenshots
 
 ### Dashboard
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](screenshots/Dashboard.png)
 
 ### Analytics
-![Analytics](screenshots/analytics.png)
+![Analytics](screenshots/Analytics.png)
 
 ### Slack Notification
-![Slack](screenshots/slack.png)
+![Slack](screenshots/Slack Alert.png)
 
 ---
 
