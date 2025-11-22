@@ -164,13 +164,13 @@ Fill out the form and watch your submission appear on the dashboard with AI anal
 ## 🎨 Screenshots
 
 ### Dashboard
-![Dashboard](screenshots/Dashboard.png)
+![Dashboard](screenshots/Dashboard.jpg)
 
 ### Analytics
-![Analytics](screenshots/Analytics.png)
+![Analytics](screenshots/Analytics.jpg)
 
 ### Slack Notification
-![Slack](screenshots/Slack Alert.png)
+![Slack](screenshots/Slack_Alert.jpg)
 
 ---
 
