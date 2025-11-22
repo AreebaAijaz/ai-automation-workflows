@@ -1,36 +1,195 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# 🎯 Lead Intelligence System
 
-## Getting Started
+AI-powered lead management system that captures, analyzes, and routes leads in real-time—reducing response time from hours to seconds.
 
-First, run the development server:
+## 🚀 What It Does
 
+When a potential customer fills out a contact form:
+1. **Captures** their information instantly via webhook
+2. **Analyzes** their message using OpenAI (scores 1-10)
+3. **Detects** urgency signals, budget indicators, and pain points
+4. **Alerts** sales team on Slack with AI-generated talking points
+5. **Displays** everything on a real-time dashboard with analytics
+
+**Result:** Sales teams respond in seconds instead of hours, never miss hot leads, and know exactly what to say.
+
+---
+
+## ✨ Features
+
+### 🤖 AI-Powered Analysis
+- Automatic lead scoring (1-10 scale)
+- Urgency detection ("urgent", "ASAP", "budget approved")
+- Pain point identification
+- Personalized action recommendations
+
+### 📊 Real-Time Dashboard
+- Live lead feed with color-coded scores
+- AI-generated insights and talking points
+- Status tracking (Pending → Contacting → Closed/Canceled)
+- Search and filter by tier (Hot/Warm/Cold)
+
+### 📈 Analytics
+- Status distribution (Pending, Contacting, Closed, Canceled)
+- Lead tier breakdown (Hot, Warm, Cold)
+- Score distribution analysis
+- Source performance tracking
+- Conversion rate metrics
+
+### ⚡ Automation
+- Instant Slack notifications for hot leads (score 8+)
+- Google Sheets auto-sync
+- Status updates synced across all platforms
+- Zero manual data entry
+
+---
+
+## 🛠️ Tech Stack
+
+**Automation:** n8n (2 workflows)  
+**AI:** OpenAI GPT-4  
+**Frontend:** Next.js 14, Tailwind CSS  
+**Charts:** Recharts  
+**Storage:** Google Sheets  
+**Notifications:** Slack API  
+
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1. Clone Repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/AreebaAijaz/ai-automation-workflows.git
+cd ai-automation-workflows/lead-intelligence
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### 3. Configure n8n Workflows
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+#### Import Workflows:
+1. Open n8n
+2. Click **Import from File**
+3. Select `workflows/lead-intelligence.json`
+4. Activate both workflows
 
-## Learn More
+#### Workflow 1: Lead Processing
+- **Webhook** → Captures form submissions
+- **AI Agent (OpenAI)** → Analyzes and scores lead
+- **Code** → Formats data
+- **Google Sheets** → Saves lead data
+- **IF** → Routes by score
+- **Slack** → Sends alerts (hot leads get priority)
 
-To learn more about Next.js, take a look at the following resources:
+#### Workflow 2: Dashboard API
+- **Webhook (GET)** → Reads all leads from Google Sheets
+- **Webhook (POST)** → Updates lead status in Google Sheets
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 4. Set Up Integrations
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+**Google Sheets:**
+1. Create spreadsheet: "Lead Intelligence Database"
+2. Add columns: `id, timestamp, name, email, company, message, source, score, tier, insights, red_flags, suggested_action, status, assigned_to`
+3. Connect n8n to your sheet
 
-## Deploy on Vercel
+**Slack:**
+1. Create Slack webhook URL
+2. Add to n8n Slack nodes
+3. Create channel: `#hot-leads`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**OpenAI:**
+1. Get API key from OpenAI
+2. Add to n8n AI Agent node
+3. Use model: `gpt-4` or `gpt-3.5-turbo`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+### 5. Update Dashboard URLs
+
+In `src/app/components/homepage.js`, update:
+```javascript
+const API_URL = 'YOUR_N8N_WEBHOOK_URL/webhook/get-leads';
+```
+
+### 6. Run Development Server
+```bash
+npm run dev
+```
+
+Visit: `http://localhost:3000`
+
+
+
+## 🎯 How It Works
+
+### Lead Capture Flow
+```
+Google Form → n8n Webhook → OpenAI Analysis → Google Sheets → Slack Alert → Dashboard
+```
+
+### Data Flow
+```
+User fills form
+    ↓
+Webhook captures (< 1 sec)
+    ↓
+AI analyzes message (3-5 sec)
+    ↓
+Scores 1-10 + generates insights
+    ↓
+Saves to Google Sheets
+    ↓
+IF score >= 8 → Urgent Slack alert
+IF score < 8 → Standard notification
+    ↓
+Dashboard displays with AI insights
+    ↓
+User changes status → POST to n8n → Updates Google Sheets
+```
+
+---
+
+## 📊 Live Demo
+
+**Dashboard:** https://leadintelligencedashboard.vercel.app/
+**Test Form:** https://forms.gle/oajx3cHpXbNdp4Da9
+
+Fill out the form and watch your submission appear on the dashboard with AI analysis in real-time!
+
+---
+
+## 🎨 Screenshots
+
+### Dashboard
+![Dashboard](screenshots/dashboard.png)
+
+### Analytics
+![Analytics](screenshots/analytics.png)
+
+### Slack Notification
+![Slack](screenshots/slack.png)
+
+---
+
+## 📈 Performance
+
+- **Lead capture:** < 1 second
+- **AI analysis:** 3-5 seconds
+- **Total processing:** < 10 seconds
+- **Dashboard refresh:** Real-time
+- **Status sync:** Instant
+
+---
+
+
+
+
+## 💬 Questions?
+
+Open an issue or reach out! Happy to help fellow learners. 🚀
+
+---
+
+**⭐ If you found this helpful, please star the repo!**
