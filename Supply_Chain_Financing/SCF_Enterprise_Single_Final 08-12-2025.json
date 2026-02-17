@@ -1,0 +1,1021 @@
+{
+  "name": "SCF_Enterprise_Single_Final",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "distributor-order",
+        "options": {}
+      },
+      "id": "b5880c3d-6226-4914-8aa9-11f9262e2d37",
+      "name": "Webhook - Distributor Order",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        64,
+        112
+      ],
+      "webhookId": "a3478fed-73a4-4e4a-a36a-6b14346f8a9a"
+    },
+    {
+      "parameters": {
+        "functionCode": "const now = new Date();\nconst y = now.getFullYear();\nconst m = String(now.getMonth()+1).padStart(2,'0');\nconst d = String(now.getDate()).padStart(2,'0');\nconst rand = Math.floor(1000 + Math.random()*9000);\nconst orderId = `ORD-${y}${m}${d}-${rand}`;\n/* Expect incoming payload in body or namedValues (Apps Script sends namedValues). Normalize */\nconst incoming = $json[\"body\"] || $json[\"payload\"] || $json[\"namedValues\"] || $json;\n// Map common fields (best-effort)\nconst DistributorID = incoming.DistributorID || (incoming['Distributor ID'] && incoming['Distributor ID'][0]) || incoming.distributorId || incoming.distributorEmail || '';\nconst DistributorName = incoming.DistributorName || incoming['Distributor Name'] || (incoming['Distributor'] && incoming['Distributor'][0]) || '';\nconst DistributorEmail = incoming.DistributorEmail || incoming['Distributor Email'] || (incoming['Email'] && incoming['Email'][0]) || '';\nconst Product = incoming.Product || (incoming['Product'] && incoming['Product'][0]) || '';\nconst Quantity = incoming.Quantity || (incoming['Quantity'] && incoming['Quantity'][0]) || '';\nconst ExpectedDelivery = incoming.ExpectedDateOfDelivery || incoming['Expected Date of Delivery'] || (incoming['ExpectedDelivery'] && incoming['ExpectedDelivery'][0]) || '';\nconst ExpectedRepayment = incoming.ExpectedRepaymentDate || incoming['Expected date of Repayment of loan'] || (incoming['ExpectedRepayment'] && incoming['ExpectedRepayment'][0]) || '';\nconst BankEmail = incoming.BankEmail || 'bank.officer@example.com';\nreturn [{\n  json: {\n    orderId,\n    DistributorID,\n    DistributorName,\n    DistributorEmail,\n    Product,\n    Quantity,\n    ExpectedDelivery,\n    ExpectedRepayment,\n    BankEmail,\n    rawIncoming: incoming,\n    receivedAt: now.toISOString()\n  }\n}];"
+      },
+      "id": "8a6f24a7-e901-4b95-8e9b-a314fb7f0669",
+      "name": "Function - Normalize Order Payload & Generate OrderID",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        288,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const now = new Date();\n\n// Accept incoming data from multiple possible sources\nconst incoming = $json.body || $json.payload || $json.namedValues || $json;\n\n// Helper: Normalize numeric strings → remove commas → convert to number\nfunction normalizeNumber(value) {\n  if (value === null || value === undefined) return 0;\n\n  // Convert arrays like [\"300,000\"] → \"300,000\"\n  if (Array.isArray(value)) value = value[0];\n\n  // Convert to string and remove commas\n  value = String(value).replace(/,/g, '').trim();\n\n  const num = Number(value);\n  return isNaN(num) ? 0 : num;\n}\n\n// Extract values safely\nconst OrderID =\n  incoming.OrderID ||\n  incoming.orderId ||\n  (incoming['Order ID'] && incoming['Order ID'][0]) ||\n  '';\n\nconst DistributorID =\n  incoming.DistributorID ||\n  (incoming['Distributor ID'] && incoming['Distributor ID'][0]) ||\n  '';\n\nconst SupplierName =\n  incoming.SupplierName ||\n  (incoming['Supplier Name'] && incoming['Supplier Name'][0]) ||\n  '';\n\nconst RequestedAmount =\n  normalizeNumber(incoming.RequestedAmount) ||\n  normalizeNumber(incoming[\"Requested Amount\"]) ||\n  normalizeNumber(incoming[\"Transaction Amount\"]);\n\n// Output clean version\nreturn [{\n  json: {\n    OrderID,\n    DistributorID,\n    RequestedAmount,\n    SupplierName,\n    rawIncoming: incoming,\n    receivedAt: now.toISOString()\n  }\n}];\n"
+      },
+      "id": "20f3bb86-ece3-4493-bf0b-f21f7cfbcb4d",
+      "name": "Function - Normalize Bank Response Payload",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        288,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {}
+          ],
+          "string": [
+            {}
+          ]
+        }
+      },
+      "id": "9a5dd20c-5953-4e6d-b6a8-6a9da8608037",
+      "name": "IF - Eligibility Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        512,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const now = new Date();\n\n// Pull all incoming data safely\nconst incoming = $json;\n\n// RequestedAmount may appear in multiple formats (single, array, string, number)\nlet requestedAmount;\n\n// Case 1: If Google Sheets sends array like [\"300000\"]\nif (Array.isArray(incoming.RequestedAmount)) {\n  requestedAmount = incoming.RequestedAmount.find(v => v !== null && v !== \"\" && v !== undefined);\n}\n// Case 2: Single value but might be null\nelse if (incoming.RequestedAmount !== null && incoming.RequestedAmount !== undefined && incoming.RequestedAmount !== \"\") {\n  requestedAmount = incoming.RequestedAmount;\n}\n\n// Ensure final result is a number\nrequestedAmount = Number(requestedAmount) || 0;\n\n// Create Transaction ID\nconst y = now.getFullYear();\nconst m = String(now.getMonth() + 1).padStart(2, '0');\nconst d = String(now.getDate()).padStart(2, '0');\nconst rand = Math.floor(1000 + Math.random() * 9000);\nconst transactionId = `TXN-${y}${m}${d}-${rand}`;\n\n// Output\nreturn [{\n  json: {\n    transactionId,\n    transactionAmount: requestedAmount,\n    OrderID: incoming.OrderID,\n    DistributorID: incoming.DistributorID,\n    SupplierName: incoming.SupplierName,\n    transactionDate: now.toISOString()\n  }\n}];\n"
+      },
+      "id": "0f363955-9d0d-4c3c-b7c9-094d0ea59558",
+      "name": "Function - Generate TransactionID + Prepare Disbursement Row",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        736,
+        336
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "payment-confirmation",
+        "options": {}
+      },
+      "id": "c9f53ef7-7c7c-45bf-9d5f-7b87cee33db0",
+      "name": "Webhook - Payment Confirmation (Distributor confirms funds & payment to supplier)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        64,
+        656
+      ],
+      "webhookId": "1bd000a3-35a7-4a69-970c-5b23d4f0889d"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Read incoming JSON safely\nconst incoming = $json.body || $json || {};\n\n// Extract fields with fallback to alternate casing\nconst transactionId =\n\tincoming.TransactionID ??\n\tincoming.transactionId ??\n\t'';\n\nconst amountPaid =\n\tincoming.AmountPaid ??\n\tincoming.amountPaid ??\n\tnull;    // Do NOT convert to Number here, keep actual value\n\nconst paymentDate =\n\tincoming.PaymentDate ??\n\tincoming.paymentDate ??\n\tnew Date().toISOString();\n\nconst product =\n\tincoming.Product ??\n\tincoming.product ??\n\t'';\n\nconst quantity =\n\tincoming.Quantity ??\n\tincoming.quantity ??\n\t'';\n\nconst distributorName =\n\tincoming.DistributorName ??\n\tincoming.distributorName ??\n\t'';\n\n// Return data to next node\nreturn [\n\t{\n\t\tjson: {\n\t\t\ttransactionId,\n\t\t\tamountPaid,\n\t\t\tpaymentDate,\n\t\t\tproduct,\n\t\t\tquantity,\n\t\t\tdistributorName,\n\t\t},\n\t},\n];\n"
+      },
+      "id": "c40a86c9-df19-4770-86e5-22fc86d04849",
+      "name": "Function - Normalize Payment Confirmation",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        288,
+        656
+      ]
+    },
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "hour": 12
+            }
+          ]
+        }
+      },
+      "id": "edffac6f-4576-4ba7-beb6-2e76e0c73f0a",
+      "name": "Cron - Daily Repayment Reminder",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -32,
+        1360
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM",
+          "mode": "list",
+          "cachedResultName": "SCF-Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1094413129,
+          "mode": "list",
+          "cachedResultName": "Orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM/edit#gid=1094413129"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "OrderID": "={{ $json.orderId }}",
+            "DistributorID": "={{ $('Webhook - Distributor Order').item.json.body.DistributorID }}",
+            "DistributorName": "={{ $('Webhook - Distributor Order').item.json.body.DistributorName }}",
+            "DistributorEmail": "={{ $json.rawIncoming.Email }}",
+            "RequestedAmount": "={{ $json.rawIncoming['Requested Amount'] }}",
+            "Supplier Name": "={{ $json.rawIncoming.Supplier }}",
+            "Product": "={{ $json.Product }}",
+            "Quantity": "={{ $json.Quantity }}",
+            "ExpectedDelivery(date)": "={{ $json.rawIncoming['ExpectedDelivery(date)'] }}",
+            "ExpectedRepayment(date)": "={{ $json.rawIncoming['ExpectedRepayment(date)'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "OrderID",
+              "displayName": "OrderID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DistributorID",
+              "displayName": "DistributorID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DistributorName",
+              "displayName": "DistributorName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DistributorEmail",
+              "displayName": "DistributorEmail",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "RequestedAmount",
+              "displayName": "RequestedAmount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Supplier Name",
+              "displayName": "Supplier Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product",
+              "displayName": "Product",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ExpectedDelivery(date)",
+              "displayName": "ExpectedDelivery(date)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ExpectedRepayment(date)",
+              "displayName": "ExpectedRepayment(date)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        512,
+        112
+      ],
+      "id": "560d2ad7-b4de-4270-873d-6745429b5b38",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mOrtcpYdnDG6Bp2F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM",
+          "mode": "list",
+          "cachedResultName": "SCF-Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 771599811,
+          "mode": "list",
+          "cachedResultName": "Disbursements",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM/edit#gid=771599811"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "TransactionID": "={{ $json.transactionId }}",
+            "OrderID": "={{ $json.OrderID }}",
+            "DistributorID": "={{ $json.DistributorID }}",
+            "TransactionDate": "={{ $json.transactionDate }}",
+            "SupplierName": "={{ $json.SupplierName }}",
+            "TransactionAmount": "={{ $json.transactionAmount }}",
+            "PaymentStatus": "={{ $('Webhook-Transaction Execution').item.json.body['Payment Status'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "TransactionID",
+              "displayName": "TransactionID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "OrderID",
+              "displayName": "OrderID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DistributorID",
+              "displayName": "DistributorID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SupplierName",
+              "displayName": "SupplierName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TransactionAmount",
+              "displayName": "TransactionAmount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "TransactionDate",
+              "displayName": "TransactionDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "PaymentStatus",
+              "displayName": "PaymentStatus",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ProofOfPaymentLink",
+              "displayName": "ProofOfPaymentLink",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        960,
+        336
+      ],
+      "id": "6d86ebbd-e540-46cb-99f6-8cec4e199944",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mOrtcpYdnDG6Bp2F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Distributor Order ",
+        "height": 240,
+        "width": 1968
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -544,
+        32
+      ],
+      "typeVersion": 1,
+      "id": "8a6485ae-3f3b-49a0-a72b-0cdf09f04071",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM",
+          "mode": "list",
+          "cachedResultName": "SCF-Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 290329488,
+          "mode": "list",
+          "cachedResultName": "Payments",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM/edit#gid=290329488"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "TransactionID": "={{ $json.transactionId }}",
+            "AmountPaid": "={{ $json.amountPaid }}",
+            "PaymentDate": "={{ $json.paymentDate }}",
+            "Product": "={{ $('Webhook - Payment Confirmation (Distributor confirms funds & payment to supplier)').item.json.body.Product }}",
+            "Quantity": "={{ $('Webhook - Payment Confirmation (Distributor confirms funds & payment to supplier)').item.json.body.Quantity }}",
+            "DistributorName": "={{ $json.distributorName }}"
+          },
+          "matchingColumns": [
+            "TransactionID"
+          ],
+          "schema": [
+            {
+              "id": "TransactionID",
+              "displayName": "TransactionID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "AmountPaid",
+              "displayName": "AmountPaid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "PaymentDate",
+              "displayName": "PaymentDate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product",
+              "displayName": "Product",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "DistributorName",
+              "displayName": "DistributorName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ProofLink",
+              "displayName": "ProofLink",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        512,
+        656
+      ],
+      "id": "8da9cb47-5eb0-47a2-a7df-a96552efe8e1",
+      "name": "Google Sheets - Append Payment (Payments sheet)",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mOrtcpYdnDG6Bp2F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Distributor confirms payment to supplier",
+        "height": 224,
+        "width": 1776,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -448,
+        592
+      ],
+      "typeVersion": 1,
+      "id": "66ba4483-0aeb-4ab3-8f0b-666069be3f00",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Supplier Invoice ",
+        "height": 432,
+        "width": 1264,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -240,
+        848
+      ],
+      "typeVersion": 1,
+      "id": "8ee34cdc-3294-427e-8d4a-acce0f376289",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM",
+          "mode": "list",
+          "cachedResultName": "SCF-Master",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1094413129,
+          "mode": "list",
+          "cachedResultName": "Orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1HrQfI9hqyWSMi6ECepj4RHuI6_APu6QgxtZhwPVNMBM/edit#gid=1094413129"
+        },
+        "options": {
+          "dataLocationOnSheet": {
+            "values": {
+              "rangeDefinition": "specifyRangeA1",
+              "range": "A1:K1000"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        1392
+      ],
+      "id": "c63729a1-7a90-4aaa-8e3e-c09de04c8d43",
+      "name": "Google Sheets - Find Due Repayments (Disbursements sheet)1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mOrtcpYdnDG6Bp2F",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.DistributorEmail }}",
+        "subject": "Request for Refund of Payment Disbursed by the Bank",
+        "message": "=<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<title>Loan Recovery Notice</title>\n<style>\n    body {\n        font-family: Arial, sans-serif;\n        background: #f7f7f7;\n        margin: 0;\n        padding: 0;\n        color: #333;\n    }\n    .container {\n        width: 100%;\n        max-width: 650px;\n        margin: 30px auto;\n        background: #ffffff;\n        padding: 30px;\n        border-radius: 10px;\n        border: 1px solid #e0e0e0;\n    }\n    .header {\n        font-size: 22px;\n        font-weight: bold;\n        color: #0057b7;\n        border-bottom: 2px solid #0057b7;\n        padding-bottom: 10px;\n        margin-bottom: 25px;\n    }\n    .section-title {\n        font-size: 18px;\n        font-weight: bold;\n        margin-top: 20px;\n        color: #444;\n    }\n    .details-table {\n        width: 100%;\n        border-collapse: collapse;\n        margin-top: 10px;\n    }\n    .details-table td {\n        padding: 8px 0;\n        font-size: 15px;\n    }\n    .label {\n        font-weight: bold;\n        width: 200px;\n        color: #555;\n    }\n    .footer {\n        margin-top: 25px;\n        font-size: 14px;\n        color: #777;\n        border-top: 1px solid #ddd;\n        padding-top: 15px;\n    }\n</style>\n</head>\n<body>\n\n<div class=\"container\">\n\n    <div class=\"header\">Loan Recovery Notice</div>\n\n    <p>Dear Concern,</p>\n\n    <p>\n        This is to inform you that the following amount is now due for repayment \n        as part of your Supply Chain Financing arrangement. Kindly ensure the \n        repayment is completed on or before the due date mentioned below.\n    </p>\n\n    <div class=\"section-title\">Recovery Details</div>\n\n    <table class=\"details-table\">\n        <tr>\n            <td class=\"label\">Order ID:</td>\n            <td> {{ $json.OrderID }}</td>\n        </tr>\n        <tr>\n            <td class=\"label\">Distributor ID:</td>\n            <td> {{ $json.DistributorID }}</td>\n        </tr>\n        <tr>\n            <td class=\"label\">Distributor Name:</td>\n            <td>{{ $json.DistributorName }} </td>\n        </tr>\n        <tr>\n            <td class=\"label\">Supplier Name:</td>\n            <td> {{ $json['Supplier Name'] }} </td>\n        </tr>\n        <tr>\n            <td class=\"label\">Product:</td>\n            <td> {{ $json.Product }} </td>\n        </tr>\n        <tr>\n            <td class=\"label\">Amount Due:</td>\n            <td><strong> {{ $json.RequestedAmount }}</strong></td>\n        </tr>\n        <tr>\n            <td class=\"label\">Repayment Date:</td>\n            <td> {{ $json['ExpectedRepayment(date)'] }}</td>\n        </tr>\n    </table>\n\n    <p>\n        Please arrange the repayment at the earliest to maintain smooth \n        operations and avoid any service interruptions.\n    </p>\n\n    <div class=\"footer\">\n        This is an automated notification. For any queries, please contact your relationship manager.\n    </div>\n\n</div>\n\n</body>\n</html>\n",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        864,
+        1392
+      ],
+      "id": "9792f5db-ab06-42f4-be62-87762ac85999",
+      "name": "Gmail - Send Reminder (for each due)1",
+      "webhookId": "986fcb5f-7c2e-4982-a139-d16446b8a954",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9DoYUQZwkIbyX5cJ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "aneesahmed.shah@gmail.com",
+        "subject": "=Disbursement Request Submitted - Distributor ID:  {{ $json.DistributorID }}",
+        "message": "=<body style=\"margin:0;padding:20px;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#222;\">\n  <table role=\"presentation\" width=\"100%\" style=\"max-width:680px;margin:0 auto;background:#ffffff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);overflow:hidden;\">\n    <tr>\n      <td style=\"padding:24px 28px;\">\n        <h2 style=\"margin:0 0 12px 0;font-size:20px;color:#0b2545;\">Supply Chain Financing Application</h2>\n        <p style=\"margin:0 0 20px 0;font-size:14px;line-height:1.45;color:#4a5568;\">\n          Dear Concern at <strong>XYZ Bank</strong>,\n        </p>\n\n        <p style=\"margin:0 0 16px 0;font-size:14px;line-height:1.45;color:#4a5568;\">\n          I/We have applied for a Supply Chain Financing transaction. Please find the details below:\n        </p>\n\n        <table role=\"presentation\" width=\"100%\" style=\"border-collapse:collapse;margin-top:10px;\">\n          <tr>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;width:38%;font-weight:600;background:#fbfdff;\">Requested Amount</td>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">{{ $json.RequestedAmount }} </td>\n          </tr>\n          <tr>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;font-weight:600;background:#fbfdff;\">Distributor ID</td>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\"> {{ $json.DistributorID }}</td>\n          </tr>\n          <tr>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;font-weight:600;background:#fbfdff;\">Distributor Name</td>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">  {{ $json.DistributorName }}</td>\n          </tr>\n          <tr>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;font-weight:600;background:#fbfdff;\">Product</td>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\"> {{ $json.Product }} </td>\n          </tr>\n          <tr>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;font-weight:600;background:#fbfdff;\">Quantity</td>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">{{ $json.Quantity }} </td>\n          </tr>\n          <tr>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;font-weight:600;background:#fbfdff;\">Supplier</td>\n            <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\"> {{ $json['Supplier Name'] }} </td>\n          </tr>\n        </table>\n\n        <p style=\"margin:18px 0 8px 0;font-size:14px;line-height:1.45;color:#4a5568;\">\n          Kindly confirm receipt and advise on the next steps. If you require any additional documents, please let me/us know.\n        </p>\n\n        <table role=\"presentation\" width=\"100%\" style=\"margin-top:18px;\">\n          <tr>\n            <td style=\"padding:0;\">\n              <p style=\"margin:0;font-size:14px;line-height:1.45;color:#4a5568;\">\n                Regards,<br>\n                <strong> {{ $json.DistributorName }}</strong><br>\n                \n              </p>\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n\n    <tr>\n      <td style=\"background:#f7fafc;padding:12px 28px;font-size:12px;color:#6b7280;text-align:center;\">\n        This message and any attachments are confidential and intended for the named recipient only.\n      </td>\n    </tr>\n  </table>\n</body>\n",
+        "options": {
+          "appendAttribution": false,
+          "ccList": ""
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        736,
+        112
+      ],
+      "id": "2fe3880c-81c7-4eda-b38c-da5baebabf1d",
+      "name": "Bank to Distributor ( Request Received )",
+      "webhookId": "eaab88cb-69cb-42fe-8597-ce7fb9c0f018",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9DoYUQZwkIbyX5cJ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "Bank Reference",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        64,
+        336
+      ],
+      "id": "6e52ffbc-3d94-4286-b1ed-235701041c0a",
+      "name": "Webhook-Transaction Execution",
+      "webhookId": "bfa2f531-e696-48a3-9e52-92e6f3cc6ed3"
+    },
+    {
+      "parameters": {
+        "content": "## Transaction Confirmation by Bank",
+        "width": 1776,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -224,
+        336
+      ],
+      "typeVersion": 1,
+      "id": "20e6fe8b-0142-4fde-92df-9510d46fb318",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "jsCode": "// --- Auto-generate invoice info ---\nconst invoiceDate = new Date().toISOString().split(\"T\")[0];\n\nconst randomNumber = Math.floor(1000 + Math.random() * 9000);\nconst today = new Date();\nconst invoiceNumber = `INV-${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}-${randomNumber}`;\n\n// Helper: find field regardless of nesting or sheet prefixes\nfunction findField(data, fieldName) {\n  const lowerField = fieldName.toLowerCase();\n\n  for (const key of Object.keys(data)) {\n    if (key.toLowerCase().includes(lowerField)) {\n      return data[key];\n    }\n  }\n  return \"\";\n}\n\nreturn items.map(item => {\n  const data = item.json;\n\n  return {\n    json: {\n      InvoiceNumber: invoiceNumber,\n      InvoiceDate: invoiceDate,\n\n      TransactionID: findField(data, \"TransactionID\"),\n      TransactionAmount: findField(data, \"AmountPaid\"),\n    \n      DistributorName: findField(data, \"DistributorName\"),\n      Product: findField(data, \"Product\"),\n      Quantity: findField(data, \"Quantity\"),\n      \n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        976
+      ],
+      "id": "3374618b-e798-47ab-bae8-be95dc705a08",
+      "name": "Invoice Creation"
+    },
+    {
+      "parameters": {
+        "html": "<!DOCTYPE html>\n<html>\n<head>\n<style>\n  body { font-family: Arial; padding: 20px; }\n  h2 { border-bottom: 2px solid #000; padding-bottom: 5px; }\n  table { width: 100%; border-collapse: collapse; margin-top: 20px; }\n  td, th { border: 1px solid #ddd; padding: 8px; }\n</style>\n</head>\n<body>\n\n<h2>Invoice</h2>\n\n<p><strong>Invoice Number:</strong> {{$json.InvoiceNumber}}</p>\n<p><strong>Invoice Date:</strong> {{$json.InvoiceDate}}</p>\n\n<h3>Transaction Details</h3>\n<table>\n  <tr><th>Field</th><th>Value</th></tr>\n  <tr><td>Transaction ID</td><td>{{$json.TransactionID}}</td></tr>\n  <tr><td>Amount</td><td>{{$json.TransactionAmount}}</td></tr>\n  \n  <tr><td>Distributor Name</td><td>{{$json.DistributorName}}</td></tr>\n  <tr><td>Product</td><td>{{$json.Product}}</td></tr>\n  <tr><td>Quantity</td><td>{{$json.Quantity}}</td></tr>\n  \n</table>\n\n</body>\n</html>\n"
+      },
+      "type": "n8n-nodes-base.html",
+      "typeVersion": 1.2,
+      "position": [
+        400,
+        1008
+      ],
+      "id": "bc2bacdd-f19c-40e8-9257-343f1899879d",
+      "name": "HTML"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Today's date (without time)\nconst today = new Date();\ntoday.setHours(0,0,0,0);\n\nconst results = [];\n\nfor (const item of items) {\n  const row = item.json;\n\n  const dueDateRaw = row[\"ExpectedRepayment(date)\"] || row.ExpectedRepayment;\n  const paymentStatus = row.PaymentStatus || \"\";\n  \n  if (!dueDateRaw) continue;\n\n  const dueDate = new Date(dueDateRaw);\n  dueDate.setHours(0,0,0,0);\n\n  const isDueToday = dueDate.getTime() === today.getTime();\n  const isOverdue = dueDate < today && paymentStatus !== \"Paid\";\n\n  if (isDueToday || isOverdue) {\n    results.push({ json: row });\n  }\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        544,
+        1440
+      ],
+      "id": "9aed68e3-7bf8-46f8-a127-6fe449e80cd8",
+      "name": "Filter Due Payments"
+    },
+    {
+      "parameters": {
+        "content": "## Loan Repayment reminder for due payments only\n",
+        "height": 368,
+        "width": 1472
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -368,
+        1312
+      ],
+      "typeVersion": 1,
+      "id": "4af33732-7b34-42a1-be0b-148d8ab595ec",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Function - Normalize Bank Response Payload').item.json.rawIncoming['Distributor Email'] }}",
+        "subject": "=Disbursement Confirmation  {{ $('Function - Normalize Bank Response Payload').item.json.DistributorID }}",
+        "message": "=<body style=\"margin:0;padding:20px;background:#f4f6f8;font-family:Arial, Helvetica, sans-serif;color:#222;\">    <table role=\"presentation\" width=\"100%\" style=\"max-width:680px;margin:0 auto;background:#ffffff;border-radius:10px;box-shadow:0 3px 12px rgba(0,0,0,0.08);overflow:hidden;\">      <!-- HEADER WITH LOGO -->     <tr>       <td style=\"background:#0b2545;padding:20px 28px;text-align:center;\">         <img src=\"https://dummyimage.com/200x60/ffffff/0b2545&text=XYZ+Bank+Logo\"               alt=\"Bank Logo\"               style=\"max-width:220px;border-radius:4px;\">         <h1 style=\"color:#ffffff;font-size:20px;margin:12px 0 0 0;font-weight:500;\">           XYZ Bank – Transaction Notification         </h1>       </td>     </tr>      <tr>       <td style=\"padding:24px 28px;\">          <h2 style=\"margin:0 0 12px 0;font-size:20px;color:#0b2545;\">           Transaction Execution Confirmation         </h2>          <p style=\"margin:0 0 18px 0;font-size:14px;line-height:1.45;color:#4a5568;\">           Dear,         </p>          <p style=\"margin:0 0 16px 0;font-size:14px;line-height:1.45;color:#4a5568;\">           We reviewed your application, and we are pleased to inform you that the transaction has been successfully executed.         </p>          <h3 style=\"font-size:16px;margin:22px 0 10px 0;color:#0b2545;\">           Transaction Information         </h3>          <table role=\"presentation\" width=\"100%\" style=\"border-collapse:collapse;\">                      <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;width:38%;background:#fbfdff;font-weight:600;\">               Transaction ID             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">                {{ $json.TransactionID }}             </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Order ID             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">                {{ $json.OrderID }}             </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Distributor ID             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">                {{ $json.DistributorID }}             </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Supplier Name             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">                {{ $json.SupplierName }}             </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Transaction Amount             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">                  {{ $json.TransactionAmount }}            </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Transaction Date             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">               {{ $json.TransactionDate }}             </td>           </tr>          </table>          <p style=\"margin:20px 0 12px 0;font-size:14px;line-height:1.45;color:#4a5568;\">           Thank you for choosing XYZ Bank. If you require any further assistance, feel free to reach out.         </p>          <p style=\"margin-top:22px;font-size:14px;line-height:1.45;color:#4a5568;\">           Regards,<br>           <strong>XYZ Bank – Operations Team</strong><br>           Email: support@xyzbank.com<br>           Phone: +1 000 000 0000         </p>        </td>     </tr>      <tr>       <td style=\"background:#f7fafc;padding:12px 28px;font-size:12px;color:#6b7280;text-align:center;\">         This message and its contents are confidential and intended solely for the recipient.       </td>     </tr>    </table>  </body>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1184,
+        336
+      ],
+      "id": "b0bb9367-ca62-4c08-af61-3973294e3aa9",
+      "name": "Transaction Disbursement",
+      "webhookId": "545de6e0-a6d8-4aca-9507-0aee9c90fa1f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9DoYUQZwkIbyX5cJ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "aneesahmed.shah@gmail.com",
+        "subject": "Payment Submitted for Inventory Order",
+        "message": "=<body style=\"margin:0;padding:20px;background:#f4f6f8;font-family:Arial, Helvetica, sans-serif;color:#222;\">    <table role=\"presentation\" width=\"100%\" style=\"max-width:680px;margin:0 auto;background:#ffffff;border-radius:10px;box-shadow:0 3px 12px rgba(0,0,0,0.08);overflow:hidden;\">      <!-- Header -->     <tr>       <td style=\"background:#0b2545;padding:20px 28px;text-align:center;\">         <h1 style=\"color:#ffffff;font-size:20px;margin:0;font-weight:500;\">           Inventory Payment Notification         </h1>       </td>     </tr>      <!-- Body -->     <tr>       <td style=\"padding:24px 28px;\">          <p style=\"margin:0 0 18px 0;font-size:14px;line-height:1.5;color:#4a5568;\">           Dear Concern,         </p>          <p style=\"margin:0 0 16px 0;font-size:14px;line-height:1.5;color:#4a5568;\">           I/We have submitted the payment for the inventory purchase order. You are kindly requested to deliver the goods accordingly.         </p>          <h3 style=\"font-size:16px;margin:22px 0 10px 0;color:#0b2545;\">           Order Details         </h3>          <table role=\"presentation\" width=\"100%\" style=\"border-collapse:collapse;\">            <tr>             <td style=\"padding:10px 12px;width:38%;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Transaction ID             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">                {{ $json.TransactionID }}             </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Amount Paid             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">               {{ $json.AmountPaid }}              </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Payment Date             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">          {{ $json.PaymentDate }}                  </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Product             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">             {{ $json.Product }}              </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Quantity             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">          {{ $json.Quantity }}                </td>           </tr>            <tr>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#fbfdff;font-weight:600;\">               Distributor Name             </td>             <td style=\"padding:10px 12px;border:1px solid #eef2f6;background:#ffffff;\">             {{ $json.DistributorName }}               </td>           </tr>          </table>          <p style=\"margin:20px 0 8px 0;font-size:14px;line-height:1.5;color:#4a5568;\">           If you require any further information or documentation, please feel free to contact us.         </p>          <p style=\"margin-top:22px;font-size:14px;line-height:1.5;color:#4a5568;\">           Regards,<br>           </strong><br>        {{ $json.DistributorName }}   <br>                    </p>        </td>     </tr>      <!-- Footer -->     <tr>       <td style=\"background:#f7fafc;padding:12px 28px;font-size:12px;color:#6b7280;text-align:center;\">         This message is confidential and intended solely for the recipient.       </td>     </tr>    </table>  </body>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        752,
+        656
+      ],
+      "id": "9acce435-a320-4d13-b3f2-7f13f7296730",
+      "name": "Email for Payment from distributor to Supplier",
+      "webhookId": "663db449-ff1a-41e0-8f10-7a62dbde1ed0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9DoYUQZwkIbyX5cJ",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "aneesahmed.shah@gmail.com",
+        "subject": "=Invoice # {{ $('Invoice Creation').item.json.InvoiceNumber }} ",
+        "message": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        48,
+        976
+      ],
+      "id": "2cbd4f59-162a-4054-af1a-a02f98199992",
+      "name": "Invoice generation",
+      "webhookId": "1387b3c7-087f-4730-b781-1464e1d57927",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "9DoYUQZwkIbyX5cJ",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - Distributor Order": {
+      "main": [
+        [
+          {
+            "node": "Function - Normalize Order Payload & Generate OrderID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Normalize Order Payload & Generate OrderID": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Normalize Bank Response Payload": {
+      "main": [
+        [
+          {
+            "node": "IF - Eligibility Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Eligibility Check": {
+      "main": [
+        [
+          {
+            "node": "Function - Generate TransactionID + Prepare Disbursement Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Generate TransactionID + Prepare Disbursement Row": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook - Payment Confirmation (Distributor confirms funds & payment to supplier)": {
+      "main": [
+        [
+          {
+            "node": "Function - Normalize Payment Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Function - Normalize Payment Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Append Payment (Payments sheet)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cron - Daily Repayment Reminder": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets - Find Due Repayments (Disbursements sheet)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Bank to Distributor ( Request Received )",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Find Due Repayments (Disbursements sheet)1": {
+      "main": [
+        [
+          {
+            "node": "Filter Due Payments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Transaction Disbursement",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook-Transaction Execution": {
+      "main": [
+        [
+          {
+            "node": "Function - Normalize Bank Response Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets - Append Payment (Payments sheet)": {
+      "main": [
+        [
+          {
+            "node": "Email for Payment from distributor to Supplier",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Invoice Creation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoice Creation": {
+      "main": [
+        [
+          {
+            "node": "HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML": {
+      "main": [
+        [
+          {
+            "node": "Invoice generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Send Reminder (for each due)1": {
+      "main": [
+        []
+      ]
+    },
+    "Filter Due Payments": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Send Reminder (for each due)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email for Payment from distributor to Supplier": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "75420a07-f901-41e1-9445-b2e7a25a14d2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d3a71f680ad6a95257ceb95598a028f5185d13d1d4a621a85ff3fd42ade68194"
+  },
+  "id": "cJ904v7dYITewiM1",
+  "tags": []
+}
