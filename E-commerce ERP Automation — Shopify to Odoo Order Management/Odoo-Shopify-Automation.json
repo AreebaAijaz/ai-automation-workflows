@@ -1,0 +1,894 @@
+{
+  "name": "Odoo-Shopify",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "topic": "orders/paid"
+      },
+      "type": "n8n-nodes-base.shopifyTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1344,
+        96
+      ],
+      "id": "12f0bdfa-e6f6-4fad-b3dc-50ec9b8b1921",
+      "name": "Shopify Trigger",
+      "webhookId": "73900092-1da1-4e77-af4b-139b21db29fc",
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "yrHNwf6TvNh7G8R9",
+          "name": "Shopify Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "line_items",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -1120,
+        96
+      ],
+      "id": "162b4940-f4c4-492d-9713-d27ec22a2981",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const data = item.json;\n  return {\n    json: {\n    customer_name: data.shipping_address.name.replace(/[\\n\\r]/g, '').trim(),\n      customer_email: data.customer.email.replace(/[\\n\\r]/g, '').trim(),\n      shopify_order_id: data.name,\n      order_amount: data.current_total_price,\n      currency: data.currency,\n      product_sku: data.line_items.sku.replace(/[\\n\\r]/g, '').trim(),\n      product_qty: data.line_items.quantity,\n      product_price: parseFloat(data.line_items.price),\n      product_name: data.line_items.name.replace(/[\\n\\r]/g, '').trim(),\n      street: data.shipping_address.address1,\n      street2: data.shipping_address.address2,\n      city: data.shipping_address.city,\n      zip: data.shipping_address.zip,\n      country: data.shipping_address.country\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -896,
+        96
+      ],
+      "id": "0e226056-e6e8-48ef-8c08-3612b6040c1e",
+      "name": "Extract Product Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const customerId = $input.first().json.id;\nconst allItems = $('Extract Product Data').all();\n\nreturn allItems.map(item => ({\n  json: {\n    odoo_customer_id: customerId,\n    product_sku: item.json.product_sku,\n    product_qty: item.json.product_qty,\n    product_price: item.json.product_price,\n    product_name: item.json.product_name,\n    shopify_order_id: item.json.shopify_order_id,\n    order_amount: item.json.order_amount,\n    customer_name: item.json.customer_name,\n    customer_email: item.json.customer_email\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        -80
+      ],
+      "id": "c1724069-3243-4c14-b4ca-8e85f0184c34",
+      "name": "Extract Existing Customer ID"
+    },
+    {
+      "parameters": {
+        "contactName": "={{ $('Extract Product Data').first().json.customer_name }}\n",
+        "additionalFields": {
+          "address": {
+            "value": {
+              "city": "={{ $('Extract Product Data').first().json.city }}",
+              "country_id": 177,
+              "state_id": 1760,
+              "street": "={{ $('Extract Product Data').first().json.street }}",
+              "street2": "={{ $('Extract Product Data').first().json.street2 }}",
+              "zip": "={{ $('Extract Product Data').first().json.zip }}"
+            }
+          },
+          "email": "={{ $('Extract Product Data').first().json.customer_email }}"
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        368
+      ],
+      "id": "ff229f0b-1b55-4371-a812-8dc010d39fea",
+      "name": "Create a contact",
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "=res.partner",
+        "operation": "getAll",
+        "options": {},
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "=email",
+              "value": "={{ $json.customer_email }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -672,
+        96
+      ],
+      "id": "d16c27fa-913a-4732-af3d-91dd6ffc0d62",
+      "name": "Find Customer in Odoo",
+      "alwaysOutputData": true,
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "5464218b-192c-4484-8914-045cc3549bf6",
+              "leftValue": "={{ Object.keys($json).length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -448,
+        96
+      ],
+      "id": "1f9d6719-2ffc-4271-aa85-ab2386f6116e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const customerId = $input.first().json.id;\nconst allItems = $('Extract Product Data').all();\n\nreturn allItems.map(item => ({\n  json: {\n    odoo_customer_id: customerId,\n    product_sku: item.json.product_sku,\n    product_qty: item.json.product_qty,\n    product_price: item.json.product_price,\n    product_name: item.json.product_name,\n    shopify_order_id: item.json.shopify_order_id,\n    order_amount: item.json.order_amount,\n    customer_name: item.json.customer_name,\n    customer_email: item.json.customer_email\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        96,
+        368
+      ],
+      "id": "7151623a-28ea-4c2c-8a0a-8e543b9358c1",
+      "name": "Extract New Customer ID"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "=sale.order.line",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "=order_id",
+              "fieldValue": "={{ $json.sales_order_id }}"
+            },
+            {
+              "fieldName": "=product_id",
+              "fieldValue": "={{ $json.product_id }}"
+            },
+            {
+              "fieldName": "=product_uom_qty",
+              "fieldValue": "={{ $json.quantity }}"
+            },
+            {
+              "fieldName": "=price_unit",
+              "fieldValue": "={{ $json.price }}"
+            },
+            {
+              "fieldName": "=name",
+              "fieldValue": "={{ $json.name }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        896,
+        96
+      ],
+      "id": "d8e4da24-9f8b-4a5a-ba89-26277ce3fe98",
+      "name": "Create order line",
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safely grab the inputs\nconst salesOrderId = $input.first()?.json?.id;\nconst shopifyData = $('Shopify Trigger').first()?.json;\nconst allProducts = $('Find Product in Odoo').all();\n\n// Safely handle line_items in case they are missing entirely\nlet shopifyItems = [];\nif (shopifyData && shopifyData.line_items) {\n  shopifyItems = Array.isArray(shopifyData.line_items)\n    ? shopifyData.line_items\n    : [shopifyData.line_items];\n}\n\nconst items = [];\n\nfor (let i = 0; i < shopifyItems.length; i++) {\n  // Safely check if the Odoo product result exists at this index\n  const odooResult = allProducts[i]?.json?.result;\n  \n  // If it exists and has at least one item, get the ID. Otherwise, return null.\n  const productId = (odooResult && odooResult.length > 0) ? odooResult[0].id : null;\n\n  items.push({\n    json: {\n      sales_order_id: salesOrderId || null,\n      product_id: productId,\n      quantity: shopifyItems[i].quantity || 0,\n      price: shopifyItems[i].price || '0.00',\n      name: shopifyItems[i].name ? String(shopifyItems[i].name) : 'Unknown Product'\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        96
+      ],
+      "id": "a7516e9e-2d8d-45b3-bbed-2cf4e8710f7e",
+      "name": "Prepare Order Lines"
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "=sale.order",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "=partner_id",
+              "fieldValue": "={{ $('Extract Existing Customer ID').isExecuted ? $('Extract Existing Customer ID').first().json.odoo_customer_id : $('Extract New Customer ID').first().json.odoo_customer_id }}"
+            },
+            {
+              "fieldName": "=partner_shipping_id",
+              "fieldValue": "={{ $('Extract Existing Customer ID').isExecuted ? $('Extract Existing Customer ID').first().json.odoo_customer_id : $('Extract New Customer ID').first().json.odoo_customer_id }}"
+            },
+            {
+              "fieldName": "=client_order_ref",
+              "fieldValue": "={{ $('Extract Product Data').first().json.shopify_order_id }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        448,
+        96
+      ],
+      "id": "b37307e7-240c-4b7e-af55-ec442092e4c3",
+      "name": "Create Sales Order",
+      "executeOnce": true,
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ecom-flexify.odoo.com/jsonrpc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"ecom-flexify\",\n      2,\n      \"1e606c34884ab226612d4bef5ff234eb53265566\",\n      \"sale.order\",\n      \"action_confirm\",\n      [[{{ $('Create Sales Order').first().json.id }}]]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1120,
+        96
+      ],
+      "id": "312e347f-007d-4df5-ba7f-0101b4134ef1",
+      "name": "Confirm Sales Order",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "=sale.order",
+        "operation": "get",
+        "customResourceId": "={{ $('Create Sales Order').item.json.id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        96
+      ],
+      "id": "dfef0876-3ac0-427e-bd49-644e6fd0176a",
+      "name": "Get Sale Order",
+      "executeOnce": true,
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "=account.move",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "=partner_id",
+              "fieldValue": "=\n{{ $('Extract Existing Customer ID').isExecuted ? $('Extract Existing Customer ID').first().json.odoo_customer_id : $('Extract New Customer ID').first().json.odoo_customer_id }}"
+            },
+            {
+              "fieldName": "=move_type",
+              "fieldValue": "out_invoice"
+            },
+            {
+              "fieldName": "=invoice_origin",
+              "fieldValue": "={{ $('Extract Product Data').first().json.shopify_order_id }}"
+            },
+            {
+              "fieldName": "=ref",
+              "fieldValue": "={{ $('Extract Product Data').first().json.shopify_order_id }}"
+            },
+            {
+              "fieldName": "=currency_id",
+              "fieldValue": "1"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        96
+      ],
+      "id": "cc570552-1f23-430e-9aab-4a768e96c47f",
+      "name": "Create Invoice",
+      "executeOnce": true,
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "=stock.picking",
+        "operation": "getAll",
+        "options": {},
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "=origin",
+              "value": "={{ $('Get Sale Order').item.json.display_name }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        96
+      ],
+      "id": "c505e7e9-3a42-41ac-b001-9f908241873f",
+      "name": "Find Delivery Order",
+      "executeOnce": true,
+      "alwaysOutputData": false,
+      "retryOnFail": true,
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ecom-flexify.odoo.com/jsonrpc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"ecom-flexify\",\n      2,\n      \"1e606c34884ab226612d4bef5ff234eb53265566\",\n      \"stock.picking\",\n      \"button_validate\",\n      [[{{ $('Find Delivery Order').item.json.id }}]]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3360,
+        96
+      ],
+      "id": "9ef9ea86-4263-40a1-8c57-91f2cbc738ba",
+      "name": "Validate Delivery",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "=account.move.line",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "=move_id",
+              "fieldValue": "={{ $('Create Invoice').item.json.id }}"
+            },
+            {
+              "fieldName": "=product_id",
+              "fieldValue": "={{ $json.product_id }}"
+            },
+            {
+              "fieldName": "=quantity",
+              "fieldValue": "={{ $json.quantity }}"
+            },
+            {
+              "fieldName": "=price_unit",
+              "fieldValue": "={{ $json.price_unit }}"
+            },
+            {
+              "fieldName": "=name",
+              "fieldValue": "={{ $('Extract Product Data').item.json.product_sku }}\n"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        2240,
+        96
+      ],
+      "id": "37c931e9-66f1-4cbc-b407-dd6902d1b56b",
+      "name": "Create Invoice Line",
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ecom-flexify.odoo.com/jsonrpc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"ecom-flexify\",\n      2,\n      \"1e606c34884ab226612d4bef5ff234eb53265566\",\n      \"account.move\",\n      \"action_post\",\n      [[{{ $('Create Invoice').first().json.id }}]]\n    ]\n  }\n}\n\n\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2464,
+        96
+      ],
+      "id": "0b248acd-e47d-42f4-a600-ae9d14a7d89d",
+      "name": "Confirm Invoice",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ecom-flexify.odoo.com/jsonrpc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"ecom-flexify\",\n      2,\n      \"1e606c34884ab226612d4bef5ff234eb53265566\",\n      \"account.move\",\n      \"action_invoice_sent\",\n      [[{{ $('Create Invoice').first().json.id }}]]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2704,
+        96
+      ],
+      "id": "d1e29e0a-71fa-416f-b418-60a40bdb7b75",
+      "name": "Open Send Wizard"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ecom-flexify.odoo.com/jsonrpc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"ecom-flexify\",\n      2,\n      \"1e606c34884ab226612d4bef5ff234eb53265566\",\n      \"account.move.send.wizard\",\n      \"create\",\n      [{\n        \"move_id\": {{ $('Create Invoice').first().json.id }}\n      }]\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2928,
+        96
+      ],
+      "id": "f374bd00-4a3f-4899-b803-73ebbbc7f329",
+      "name": "Create Send Wizard"
+    },
+    {
+      "parameters": {
+        "jsCode": "const invoiceId = $('Create Invoice').first().json.id;\nconst shopifyData = $('Shopify Trigger').first().json;\nconst allProducts = $('Find Product in Odoo').all();\n\nconst shopifyItems = Array.isArray(shopifyData.line_items)\n  ? shopifyData.line_items\n  : [shopifyData.line_items];\n\nconst items = [];\n\nfor (let i = 0; i < shopifyItems.length; i++) {\n  items.push({\n    json: {\n      move_id: invoiceId,\n      product_id: allProducts[i].json.result[0].id,\n      quantity: shopifyItems[i].quantity,\n      price_unit: parseFloat(shopifyItems[i].price),\n      name: String(shopifyItems[i].name)\n    }\n  });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        96
+      ],
+      "id": "774e6554-5fd8-4776-bbea-73dca5688b3d",
+      "name": "Prepare Invoice Lines "
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ecom-flexify.odoo.com/jsonrpc",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"ecom-flexify\",\n      2,\n      \"1e606c34884ab226612d4bef5ff234eb53265566\",\n      \"product.product\",\n      \"search_read\",\n      [[[\"default_code\", \"=\", \"{{ $json.product_sku }}\"]]],\n      {\"fields\": [\"id\", \"name\", \"default_code\"], \"limit\": 1}\n    ]\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        256,
+        96
+      ],
+      "id": "1597c1c8-3c91-451e-a7bc-b31e3c9ace39",
+      "name": "Find Product in Odoo"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "contactId": "={{ $json.id }}",
+        "updateFields": {
+          "name": "={{ $('Extract Product Data').first().json.customer_name.replace(/[\\r\\n]/g, '').trim() }}"
+        }
+      },
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [
+        -128,
+        368
+      ],
+      "id": "4d2c8ad4-d364-4ffb-b7f9-6f0d50895fe4",
+      "name": "Update a contact",
+      "credentials": {
+        "odooApi": {
+          "id": "FjzqhVa2iDE1fur8",
+          "name": "Odoo account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ecom-flexify.odoo.com/jsonrpc",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"method\": \"call\",\n  \"params\": {\n    \"service\": \"object\",\n    \"method\": \"execute_kw\",\n    \"args\": [\n      \"ecom-flexify\",\n      2,\n      \"1e606c34884ab226612d4bef5ff234eb53265566\",\n      \"account.move.send.wizard\",\n      \"action_send_and_print\",\n      [[{{ $json.result }}]]\n    ],\n    \"kwargs\": {\n      \"context\": {\n        \"active_model\": \"account.move\",\n        \"active_ids\": [{{ $('Create Invoice').first().json.id }}]\n      }\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3152,
+        96
+      ],
+      "id": "ff418d66-8571-4fd3-a5bc-c4e99d4df034",
+      "name": "Send Invoice to Customer"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Shopify Trigger": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Extract Product Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Product Data": {
+      "main": [
+        [
+          {
+            "node": "Find Customer in Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a contact": {
+      "main": [
+        [
+          {
+            "node": "Update a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Customer in Odoo": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Extract Existing Customer ID",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create a contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract New Customer ID": {
+      "main": [
+        [
+          {
+            "node": "Find Product in Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Existing Customer ID": {
+      "main": [
+        [
+          {
+            "node": "Find Product in Odoo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Order Lines": {
+      "main": [
+        [
+          {
+            "node": "Create order line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create order line": {
+      "main": [
+        [
+          {
+            "node": "Confirm Sales Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Sales Order": {
+      "main": [
+        [
+          {
+            "node": "Prepare Order Lines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Sales Order": {
+      "main": [
+        [
+          {
+            "node": "Get Sale Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sale Order": {
+      "main": [
+        [
+          {
+            "node": "Find Delivery Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Invoice": {
+      "main": [
+        [
+          {
+            "node": "Prepare Invoice Lines ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Delivery Order": {
+      "main": [
+        [
+          {
+            "node": "Create Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Invoice Line": {
+      "main": [
+        [
+          {
+            "node": "Confirm Invoice",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Invoice": {
+      "main": [
+        [
+          {
+            "node": "Open Send Wizard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open Send Wizard": {
+      "main": [
+        [
+          {
+            "node": "Create Send Wizard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Send Wizard": {
+      "main": [
+        [
+          {
+            "node": "Send Invoice to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Invoice Lines ": {
+      "main": [
+        [
+          {
+            "node": "Create Invoice Line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Product in Odoo": {
+      "main": [
+        [
+          {
+            "node": "Create Sales Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a contact": {
+      "main": [
+        [
+          {
+            "node": "Extract New Customer ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Invoice to Customer": {
+      "main": [
+        [
+          {
+            "node": "Validate Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "cf3ae128-0dc3-4c36-9ec8-7bd4e3e8318d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "84d9c83d5fef63df87221bd57ea100cba5b902448a9ae6d86c1a7962fac211f6"
+  },
+  "id": "XEc0iu0FRSaOhS8r",
+  "tags": []
+}
