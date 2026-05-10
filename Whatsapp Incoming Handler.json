@@ -1,0 +1,651 @@
+{
+  "name": "Whatsapp Incoming Handler",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        -24
+      ],
+      "id": "848ae9ef-760b-4ec9-a9ca-b813087aea6a",
+      "name": "Webhook",
+      "webhookId": "9ee7657e-8d1a-4335-9676-03557fe22ad3"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1d050fe4-7f9e-4963-931b-e08b072a6a08",
+              "name": "message",
+              "value": "={{ $json.body.entry[0].changes[0].value.messages[0].text.body }}",
+              "type": "string"
+            },
+            {
+              "id": "40eb3d61-053a-461e-8208-b5173e6506d4",
+              "name": "from ",
+              "value": "={{ $json.body.entry[0].changes[0].value.contacts[0].wa_id }}",
+              "type": "string"
+            },
+            {
+              "id": "ede10d2c-86b9-4f8d-ae6c-bf3b8edbef1b",
+              "name": "name",
+              "value": "={{ $json.body.entry[0].changes[0].value.contacts[0].profile.name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        -24
+      ],
+      "id": "067d5993-2d5f-4901-ac0b-1341d6cb80c9",
+      "name": "Extract Message Data"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an assistant for a Pakistani pharma distribution company.\nAnalyze this message and return a JSON object with exactly 2 fields:\n- \"intent\": one of 'pricing', 'availability', or 'general'\n- \"product\": the medicine/product name mentioned, or null if none\n\nReturn ONLY the raw JSON, no explanation, no markdown, no backticks.\nDo not add any newlines or whitespace before or after the JSON.\n\nMessage: {{ $('Extract Message Data').item.json.message }}",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        448,
+        -24
+      ],
+      "id": "ea32f85c-6497-4936-b7cb-1458dc0670b1",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 16
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        520,
+        200
+      ],
+      "id": "34d4647d-a9c9-45fe-85d4-2510334542ad",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "M72bTBKnDDMpIJoV",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d3a9da49-3aa4-45e3-9c53-64034a3feaa4",
+              "name": "User Intent",
+              "value": "={{ JSON.parse($json.output.trim()).intent }}",
+              "type": "string"
+            },
+            {
+              "id": "9f5ca15a-bf84-47b0-abb2-153b6779d24e",
+              "name": "from",
+              "value": "={{ $('Webhook').item.json.body.entry[0].changes[0].value.messages[0].from }}",
+              "type": "string"
+            },
+            {
+              "id": "029688c1-215e-4dca-8bbc-301b071f2b12",
+              "name": "message",
+              "value": "={{ $('Webhook').item.json.body.entry[0].changes[0].value.messages[0].text.body }}",
+              "type": "string"
+            },
+            {
+              "id": "75dbd796-1bd1-4f6d-8005-c5469200fc2d",
+              "name": "name",
+              "value": "={{ $('Webhook').item.json.body.entry[0].changes[0].value.contacts[0].profile.name }}",
+              "type": "string"
+            },
+            {
+              "id": "a3e4712b-30ec-45dd-a17a-272eed9162bb",
+              "name": "product",
+              "value": "={{ JSON.parse($json.output).product }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        -24
+      ],
+      "id": "1909a04a-9990-4238-bfe7-ee297f223597",
+      "name": "Extract Intent"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json['User Intent'] }}",
+                    "rightValue": "pricing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "77ace51b-98b9-4749-8965-c0c6c9a4b0a5"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c07a2c9a-8b33-4e72-9e8c-dd638b296eb8",
+                    "leftValue": "={{ $json['User Intent'] }}",
+                    "rightValue": "availability",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "194b4074-8fef-4749-8e30-ed02818fb497",
+                    "leftValue": "={{ $json['User Intent'] }}",
+                    "rightValue": "general",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        1024,
+        -40
+      ],
+      "id": "1e80d309-3296-4181-8054-11c2022fb30a",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1aAWjdvoGPv_0XZgqsLtqREg20bJibKwD4x3JCpYez6I",
+          "mode": "list",
+          "cachedResultName": "Pharma products ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aAWjdvoGPv_0XZgqsLtqREg20bJibKwD4x3JCpYez6I/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aAWjdvoGPv_0XZgqsLtqREg20bJibKwD4x3JCpYez6I/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "product_name",
+              "lookupValue": "={{ $json.product }}"
+            }
+          ]
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1248,
+        -424
+      ],
+      "id": "aa9d0e74-ee41-425e-87cb-72e158cf9ebf",
+      "name": "Pricing Handler ",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "eFSvDMDLmd2ubTC0",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1aAWjdvoGPv_0XZgqsLtqREg20bJibKwD4x3JCpYez6I",
+          "mode": "list",
+          "cachedResultName": "Pharma products ",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aAWjdvoGPv_0XZgqsLtqREg20bJibKwD4x3JCpYez6I/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1aAWjdvoGPv_0XZgqsLtqREg20bJibKwD4x3JCpYez6I/edit#gid=0"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "availability",
+              "lookupValue": "={{ $('Extract Intent').item.json.product }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1248,
+        -24
+      ],
+      "id": "8d6fa3c7-4b6a-46f1-9cba-c40447970e6a",
+      "name": "Availability Handler",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "eFSvDMDLmd2ubTC0",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a WhatsApp assistant for a Pakistani pharma company. \nA customer asked: {{ $('Switch').item.json.message }}\nProduct data:\n* Product Name: {{ $json.product_name }}\n*Price (pkr):{{ $json.price_pkr }}\nReply naturally in Roman Urdu + English mix. Include product name and price in PKR.\nKeep it under 3 lines.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1472,
+        -528
+      ],
+      "id": "037a3c73-ece6-4d25-b6eb-af00bcd24dd9",
+      "name": "AI Agent1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a WhatsApp assistant for a Pakistani pharma company.\nA customer asked: {{ $('Extract Intent').item.json.message }}\nProduct data:\n* Product Name: {{ $json.product_name }}\n*Availability (pkr):{{ $json.availability }}\nReply naturally in Roman Urdu + English mix. Mention stock status clearly.\nKeep it under 3 lines.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1472,
+        -128
+      ],
+      "id": "188c7e62-b01b-49ae-a73e-f6326d69f740",
+      "name": "AI Agent2"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1544,
+        96
+      ],
+      "id": "ee2921c1-7d17-4306-8baa-e7f0f973e5aa",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "M72bTBKnDDMpIJoV",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1544,
+        -304
+      ],
+      "id": "0eb4c5cc-a0f1-403d-b7eb-499a3aa83f48",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "M72bTBKnDDMpIJoV",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are a WhatsApp assistant for a Pakistanin pharma distribution company.\nCustomer name: {{ $json.name }}\nMessage: {{ $json.message }}\nReply helpfully in Roman Urdu + English mix. Keep it under 4 lines.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1472,
+        376
+      ],
+      "id": "d91e0038-08d6-413a-937d-c6fdc350d187",
+      "name": "AI Agent3"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1544,
+        600
+      ],
+      "id": "5aa6c4f2-8882-4d77-8f34-2d9702426e57",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "M72bTBKnDDMpIJoV",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v19.0/+1 (555) 629-5156/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer EAARkzuMIjNUBRfzsuGRx5WWGnZBrMZCd4W13icD2NWz3sDfpuGeZCMxjCjZCPBZANZCZCoDOPlO63ZADt94JtZCPHqWjZBm0DjgQqOK3uRetpQZC2qjZCqMZCbWgtqlRd0iiZBbjeXPsm30VJFZBgO7X2gPUU6zAez8Xgq1nfBhkiZCtuzFOAjQQ0lXZBXtzgayGWkFymCgZDZD"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $('Extract Intent').item.json.from }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"body\": \"{{ $json.output }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1824,
+        -16
+      ],
+      "id": "a192839c-7cf6-4c30-81da-666a9dae0317",
+      "name": "HTTP Request"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Message Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Message Data": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Extract Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Intent": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Pricing Handler ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Availability Handler",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pricing Handler ": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Availability Handler": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent3",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent3": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ba52ab9a-dd79-42f4-a33a-0c261d207bce",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c0b40ce3f17887dd46e3c1bbe5e3c1c66ab40f893549dfae18b2b1c79389b8e6"
+  },
+  "id": "NnvsEzfZrABaCK6f",
+  "tags": []
+}
