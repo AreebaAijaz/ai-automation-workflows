@@ -6,7 +6,9 @@ An AI-powered customer support and sales agent for **Techmen**, a laptop retaile
 
 The agent handles end-to-end customer interaction on WhatsApp — from greeting and product discovery to order placement — while automatically escalating bulk/business inquiries to the sales team via Slack.
 
-[![Workflow Screenshot](screenshots/Laptop-Selling-Assist.png)](screenshots/Laptop-Selling-Assistant.png)
+
+![Workflow Screenshot](../screenshots/Laptop-Selling-Assistant.jpg)
+
 
 ## Features
 
