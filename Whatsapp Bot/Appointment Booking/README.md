@@ -14,7 +14,7 @@ Patients message the clinic on WhatsApp and are guided through a natural convers
 
 No manual back-and-forth with staff — the entire flow, from greeting to confirmed booking, is automated.
 
-[![Workflow Screenshot](screenshots/Appointment-Booking-Bot.jpg)](Appointment-Booking-Bot.jpg)
+[![Workflow Screenshot](screenshots/Appointment-Booking-Bot.jpg)]
 
 ## Tech Stack
 
